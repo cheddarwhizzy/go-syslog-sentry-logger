@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/getsentry/raven-go"
@@ -12,6 +13,9 @@ func main() {
 	handler := syslog.NewChannelHandler(channel)
 
 	raven.SetDSN(os.Getenv("SENTRY_DSN"))
+	if os.Getenv("DEBUG") == "true" {
+		fmt.Println("Using Sentry DSN:", os.Getenv("SENTRY_DSN"))
+	}
 	server := syslog.NewServer()
 	server.SetFormat(syslog.RFC5424)
 	server.SetHandler(handler)
@@ -21,9 +25,16 @@ func main() {
 
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
-			// fmt.Println(logParts)
+			info := map[string]string{
+				"message":  logParts["message"].(string),
+				"hostname": logParts["hostname"].(string),
+			}
+			if os.Getenv("DEBUG") == "true" {
+				fmt.Println(logParts)
+				fmt.Println("Sending", info)
+			}
 			if str, ok := logParts["message"].(string); ok {
-				raven.CaptureMessage(str, nil, nil)
+				raven.CaptureMessage(str, info, nil)
 			}
 		}
 	}(channel)
